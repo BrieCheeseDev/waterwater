@@ -1,0 +1,328 @@
+<!doctype html>
+<html lang="en">
+<head>
+	<meta charset="utf-8" />
+	<meta name="viewport" content="width=device-width, initial-scale=1" />
+	<title>Keep yo ass hydrated</title>
+	<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+	<style>
+		:root {
+			--bs-primary: #22d3ee;
+		} /* cyan accent */
+		body {
+			background-color: #0f172a;
+		}
+		.card {
+			background-color: #111827;
+			border-color: #1f2937;
+			color: #e5e7eb;
+		}
+		.text-muted {
+			color: #94a3b8 !important;
+		}
+		#log {
+			max-height: 220px;
+			overflow: auto;
+		}
+		#pathView {
+			font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+		}
+	</style>
+</head>
+<body class="text-light">
+	<div class="container my-4">
+		<div class="card shadow-sm">
+			<div class="card-body">
+				<div class="row g-4">
+					<!------------ Left column ------------>
+					<section class="col-12 col-md-6">
+						<h2 class="h6 text-muted text-uppercase mb-2">Destination</h2>
+						<div class="row g-2 align-items-end">
+							<div class="col-12">
+								<label for="destinationSelect" class="form-label">Choose destination</label>
+								<select id="destinationSelect" class="form-select"></select>
+							</div>
+							<div class="col d-flex gap-2">
+								<button id="startBtn" class="btn btn-primary">Start from Root of Aorta</button>
+								<button id="resetBtn" class="btn btn-outline-light" title="Reset game & score (triple‑wrong also resets)">Reset</button>
+							</div>
+						</div>
+
+						<div class="mt-3 d-flex flex-wrap gap-2">
+							<span class="badge rounded-pill text-bg-secondary">Score: <strong id="score">0</strong></span>
+							<span class="badge rounded-pill text-bg-secondary">Wrong in a row: <strong id="wrong">0</strong>/3</span>
+							<span class="badge rounded-pill text-bg-dark border">Per step: +10</span>
+							<span class="badge rounded-pill text-bg-dark border">Goal bonus: +20</span>
+						</div>
+
+						<div id="status" class="alert mt-3 d-none" role="alert"></div>
+
+						<h2 class="h6 text-muted text-uppercase mt-4 mb-2">Choose Next Branch</h2>
+						<div id="options" class="btn-group flex-wrap" role="group" aria-label="Next options"></div>
+
+						<h2 class="h6 text-muted text-uppercase mt-4 mb-2">Current Path</h2>
+						<div id="pathView" class="form-control bg-transparent text-light">–</div>
+					</section>
+					<!------------ End Left column ------------>
+					<!------------ Right column ------------>
+					<section class="col-12 col-md-6">
+						<h2 class="h6 text-muted text-uppercase mb-2">Event Log</h2>
+						<div id="log" class="form-control bg-transparent text-light"></div>
+						<h2 class="h6 text-muted text-uppercase mt-4 mb-2">Tips</h2>
+						<ul class="mb-0 small text-muted">
+							<li>Pick a destination and hit <em>Start</em>.</li>
+							<li>Follow branches that still lead to your destination.</li>
+							<li>Choosing a dead branch increments the <strong>wrong</strong> counter.</li>
+							<li>At 3 wrong, your score resets to zero (and wrong counter clears).</li>
+							<li>Reach the destination to gain a +20 bonus.</li>
+						</ul>
+					</section>
+					<!------------End Right column ------------>
+				</div>
+			</div>
+			<div class="card-footer d-flex justify-content-between small text-muted">
+				<div>Told you I could make it in 30 minutes. I lied. Took me abour 6 hours.</div>
+			</div>
+		</div>
+	</div>
+
+	<script>
+		const pathwayHierarchy = {
+			'Root of Aorta': ['Ascending Aorta', 'Right Coronary Artery (RCA)', 'Left Main Coronary Artery (LMCA)'],
+			'Ascending Aorta': ['Arch of the Aorta'],
+			'Arch of the Aorta': ['Brachiocephalic Trunk (Innominate Artery)', 'Left Common Carotid Artery', 'Left Subclavian Artery', 'Descending Aorta'],
+			'Brachiocephalic Trunk (Innominate Artery)': [],
+			'Left Common Carotid Artery': ['Left External Carotid Artery'],
+			'Left Subclavian Artery': ['Left External Carotid Artery'],
+			'Right Coronary Artery (RCA)': ['Sinoatrial Nodal Artery', 'Right Marginal Artery'],
+			'Sinoatrial Nodal Artery': ['Sinoatrial (SA) node'],
+			'Right Marginal Artery': ['Right ventricle'],
+			'Left Main Coronary Artery (LMCA)': ['Left Anterior Descending Artery (LAD)', 'Left Circumflex Artery (LCX)'],
+			'Left Anterior Descending Artery (LAD)': ['Anterior walls of both ventricles and most of interventricular septum'],
+			'Left Circumflex Artery (LCX)': ['Lateral and posterior walls of left ventricle'],
+			'Right Common Carotid Artery': ['Right External Carotid Artery'],
+			'Right Subclavian Artery': ['Vertebral artery', 'Internal thoracic artery', 'Thyrocervical trunk', 'Suprascapular artery'],
+			'Descending Aorta': ['Thoracic Aorta', 'Abdominal Aorta'],
+			'Thoracic Aorta': ['Left Intercostal Arteries', 'Right Intercostal Arteries', 'Bronchial Arteries', 'Esophageal Arteries', 'Pericardial Arteries', 'Superior Phrenic Arteries'],
+			'Left Intercostal Arteries': ['Supply the intercostal spaces and muscles of the thoracic wall (Left side).'],
+			'Right Intercostal Arteries': ['Supply the intercostal spaces and muscles of the thoracic wall (Right side).'],
+			'Bronchial Arteries': ['Supply the bronchi and lung tissues.'],
+			'Esophageal Arteries': ['Supply the esophagus.'],
+			'Pericardial Arteries': ['Supply the pericardium.'],
+			'Superior Phrenic Arteries': ['Supply the superior surface of the diaphragm.'],
+			'Abdominal Aorta': ['Superior Epigastric Arteries', 'Left and Right Inferior Phrenic Arteries'],
+			'Superior Epigastric Arteries': ['Supply the anterior abdominal wall.'],
+			'Left and Right Inferior Phrenic Arteries': ['Supply the inferior surface of the diaphragm.'],
+			'Right External Carotid Artery': ['Superior thyroid artery', 'Lingual artery', 'Facial artery', 'Ascending pharyngeal artery', 'Occipital artery', 'Posterior auricular artery', 'Maxillary artery'],
+			'Superior thyroid artery': ['thyroid gland'],
+			'Lingual artery': ['tongue', 'floor of the mouth', 'sublingual salivary gland'],
+			'Facial artery': ['face', 'submandibular salivary gland', 'muscles of facial expression'],
+			'Ascending pharyngeal artery': ['pharynx', 'soft palate', 'tonsils'],
+			'Occipital artery': ['posterior scalp', 'muscles of the occipital region'],
+			'Posterior auricular artery': ['external ear', 'scalp posterior to the ear'],
+			'Maxillary artery': ['deep structures of the face', 'maxilla', 'teeth', 'palate', 'temporal region'],
+			'Left External Carotid Artery': ['Superior thyroid artery', 'Lingual artery', 'Facial artery', 'Ascending pharyngeal artery', 'Occipital artery', 'Posterior auricular artery', 'Maxillary artery'],
+			'Right Internal Carotid Artery': ['Ophthalmic artery', 'Anterior cerebral artery', 'Middle cerebral artery', 'Posterior communicating artery'],
+			'Ophthalmic artery': ['eye', 'retina', 'orbital structures', 'parts of the forehead'],
+			'Anterior cerebral artery': ['medial aspects of the frontal and parietal lobes'],
+			'Middle cerebral artery': ['lateral aspects of the frontal, parietal, and temporal lobes'],
+			'Posterior communicating artery': ['part of the cerebral arterial circle (Circle of Willis)', 'contributes to the blood supply of the brain'],
+			'Left Internal Carotid Artery': ['Ophthalmic artery', 'Anterior cerebral artery', 'Middle cerebral artery', 'Posterior communicating artery'],
+			'Right Vertebral Artery': ['Posterior inferior cerebellar artery (PICA)', 'Basilar artery'],
+			'Posterior inferior cerebellar artery (PICA)': ['posterior inferior aspect of the cerebellum'],
+			'Basilar artery': ['brainstem', 'cerebellum', 'branches to the inner ear', 'pons', 'other structures'],
+			'Left Vertebral Artery': ['Posterior inferior cerebellar artery (PICA)', 'Basilar artery'],
+			'Vertebral artery': ['brainstem', 'cerebellum', 'posterior aspects of the brain'],
+			'Internal thoracic artery': ['anterior chest wall', 'mammary gland'],
+			'Thyrocervical trunk': ['branches to the thyroid gland', 'neck muscles', 'scapular region'],
+			'Suprascapular artery': ['supraspinatus muscle', 'infraspinatus muscle'],
+			'Right Superior Thyroid Artery': ['Superior laryngeal artery'],
+			'Superior laryngeal artery': ['larynx', 'contributes to the blood supply of the vocal cords'],
+			'Left Superior Thyroid Artery': ['Superior laryngeal artery'],
+			'Right Ascending Cervical Artery': ['Muscular branches', 'Inferior thyroid artery'],
+			'Muscular branches': ['muscles of the neck'],
+			'Inferior thyroid artery': ['thyroid gland', 'contributes to the blood supply of the larynx'],
+			'Left Ascending Cervical Artery': ['Muscular branches', 'Inferior thyroid artery'],
+			'Right Superficial Temporal Artery': ['Transverse facial artery', 'Frontal branches', 'Parietal branches', 'Middle temporal artery', 'Anterior auricular artery'],
+			'Transverse facial artery': ['parotid duct', 'buccinator muscle', 'other facial structures'],
+			'Frontal branches': ['frontal region of the scalp'],
+			'Parietal branches': ['parietal region of the scalp'],
+			'Middle temporal artery': ['temporal region of the scalp'],
+			'Anterior auricular artery': ['external ear', 'adjacent structures'],
+			'Left Superficial Temporal Artery': ['Transverse facial artery', 'Frontal branches', 'Parietal branches', 'Middle temporal artery', 'Anterior auricular artery'],
+			'Left Posterior Intercostal Arteries': ['Supply the posterior thoracic wall and spinal cord (Left side).'],
+			'Right Posterior Intercostal Arteries': ['Supply the posterior thoracic wall and spinal cord (Right side).'],
+			'Left Anterior Intercostal Arteries': ['Supply the anterior thoracic wall and intercostal spaces (Left side).'],
+			'Right Anterior Intercostal Arteries': ['Supply the anterior thoracic wall and intercostal spaces (Right side).']
+		};
+
+		const pointsPerCorrectChoice = 10;
+		const pointsPerCorrectAnswer = 20;
+		const maxWrongAnswers = 3;
+
+		// initial state
+		const state = { score: 0, wrong: 0, destination: null, current: 'Root of Aorta', active: false, path: ['Root of Aorta'] };
+
+		const restartFromScratch = () => {
+			// resetting the state
+			state.score = 0;
+			state.wrong = 0;
+			state.current = 'Root of Aorta';
+			state.path = ['Root of Aorta'];
+			state.destination = null; // force re-start
+			state.active = false;
+
+			// resetting the ui
+			document.getElementById('destinationSelect').selectedIndex = 0;
+			document.getElementById('options').innerHTML = '';
+			document.getElementById('pathView').textContent = '–';
+			updateHud();
+
+			// status message
+			const elStatus = document.getElementById('status');
+			elStatus.classList.remove('d-none', 'alert-success', 'alert-danger');
+			elStatus.classList.add('alert', 'alert-warning');
+			elStatus.textContent = 'Three wrong picks. Restarting from scratch — choose a destination and press Start.';
+		}
+
+		// DOM selectors
+		const selDestination = document.getElementById('destinationSelect');
+		const btnStart = document.getElementById('startBtn');
+		const btnReset = document.getElementById('resetBtn');
+		const elOptions = document.getElementById('options');
+		const elPath = document.getElementById('pathView');
+		const elScore = document.getElementById('score');
+		const elWrong = document.getElementById('wrong');
+		const elLog = document.getElementById('log');
+		const elStatus = document.getElementById('status');
+
+		// helpers 
+		const log = (msg) => {
+			elLog.innerHTML = `<div>► ${msg}</div>` + elLog.innerHTML;
+		};
+
+		const getTerminalNodes = (hier) => {
+			const children = new Set();
+			Object.values(hier).forEach(arr => arr.forEach(n => children.add(n)));
+			const terminals = [];
+			for (const c of children) if (!hier[c]) terminals.push(c);
+			return terminals.sort();
+		};
+
+		const getReachableLocations = (start) => { const out = []; const seen = new Set(); const dfs = (loc) => { if (seen.has(loc)) return; seen.add(loc); const kids = pathwayHierarchy[loc] || []; for (const k of kids) { out.push(k); dfs(k); } }; dfs(start); return out; };
+		const showStatus = (text, ok=true) => {
+			elStatus.textContent = text;
+			elStatus.classList.remove('d-none', 'alert-success', 'alert-danger', 'alert-warning');
+			elStatus.classList.add('alert', ok ? 'alert-success' : 'alert-danger');
+		};
+		const hideStatus = () => {
+			elStatus.classList.add('d-none');
+		};
+		const updateHud = () => {
+			elScore.textContent = state.score;
+			elWrong.textContent = state.wrong;
+			elPath.textContent = state.path.join("\n" + ' ▶ ');
+		};
+
+		const renderOptions = () => {
+			elOptions.innerHTML = '';
+			if (!state.active) return;
+			const options = pathwayHierarchy[state.current] || [];
+			if (options.length === 0) {
+				// this """should never happen"""; instead it happens when you have a node with
+				// an empty array as its children such as the Brachiocephalic Trunk
+				// could build a way to check children for empty arrays and just skip/ignore them
+				// but fuck it I am too lazy to think about it 
+				log(`No further options from <b>${state.current}</b>.`);
+				showStatus('Dead end. Choose Reset or Start again with a different destination.', false);
+				return;
+			}
+			options.forEach((opt, i) => {
+				const btn = document.createElement('button');
+				btn.className = 'btn btn-outline-light btn-sm m-1';
+				btn.textContent = `${i + 1}. ${opt}`;
+				btn.addEventListener('click', () => handlePick(opt));
+				elOptions.appendChild(btn);
+			});
+		};
+
+		const handlePick = (selected) => {
+			if (!state.active) return;
+
+			if (selected === state.destination) {
+				state.path.push(selected);
+				state.current = selected;
+				state.score += pointsPerCorrectChoice + pointsPerCorrectAnswer; // step + goal bonus
+				log(`Reached destination <b>${selected}</b>. +${pointsPerCorrectChoice + pointsPerCorrectAnswer} points`);
+				showStatus('🎉 Congratulations! You have reached the final destination.', true);
+				state.active = false;
+				updateHud();
+				renderOptions();
+				return;
+			}
+
+			const reachable = getReachableLocations(selected);
+			// wrong branch check
+			if (!reachable.includes(state.destination)) {
+				state.wrong += 1;
+				log(`Wrong branch: <b>${selected}</b> does not lead to <b>${state.destination}</b>. (${state.wrong}/3)`);
+				elStatus.classList.remove('d-none', 'alert-success', 'alert-warning');
+				elStatus.classList.add('alert', 'alert-danger');
+				elStatus.textContent = 'This option does not lead to the chosen destination.';
+
+				if (state.wrong >= maxWrongAnswers) {
+					restartFromScratch();
+					return; // stopping here, must press Start again
+				}
+
+				updateHud();
+				return;
+			}
+
+			state.score += pointsPerCorrectChoice;
+			state.current = selected;
+			state.path.push(selected);
+			log(`Good choice: moved to <b>${selected}</b>. +${pointsPerCorrectChoice} points`);
+			hideStatus();
+			updateHud();
+			renderOptions();
+		};
+
+		const resetGame = (keepScore=false) => {
+			if (!keepScore) state.score = 0;
+			state.wrong = 0;
+			state.current = 'Root of Aorta';
+			state.path = ['Root of Aorta'];
+			state.active = false;
+			hideStatus();
+			updateHud();
+			renderOptions();
+			elLog.innerHTML = ''; // clearing log, not sure if I want it
+		};
+
+		const startGame = () => {
+			state.destination = selDestination.value;
+			resetGame(true); // keep score between rounds
+			state.active = true;
+			log(`Starting new round. Destination: <b>${state.destination}</b>. Start at <b>${state.current}</b>.`);
+			hideStatus();
+			updateHud();
+			renderOptions();
+			elLog.innerHTML = ''; // clearing log, not sure if I want it
+		};
+
+		const init = () => {
+			const terminals = getTerminalNodes(pathwayHierarchy);
+			document.getElementById('destinationSelect').innerHTML = terminals.map(t => `<option value="${t}">${t}</option>`).join('');
+			updateHud();
+			renderOptions();
+			document.getElementById('startBtn').addEventListener('click', startGame);
+			document.getElementById('resetBtn').addEventListener('click', () => resetGame(false));
+		};
+
+		init();
+	</script>
+	<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>
+
